@@ -1,0 +1,430 @@
+Sub RunCBDSReport() 'Sub for the program. Calls five functions that each handles a task. Some tasks have multiple functions to keep the program tidy.
+    Application.ScreenUpdating = False
+    Call populateReport
+    Call getData
+    Call tallyData
+    Call saveWorkBook
+    Call sendEmail
+    ThisWorkbook.Close False
+End Sub
+
+'#########################################################################################################################################################################################################
+'#########################################################################################################################################################################################################
+Private Function populateReport() 'Driving functin for handling template and format of the monthly report.
+    Call getAttendanceRoster
+    Call formatCells
+    Call getDaysOfWeek(MonthName(Month(getDate)), Year(getDate))
+    Call trimDays
+    Call addBorders
+    Call addAlternateRows
+    Call addExtraDates
+    Call centerColumns
+End Function
+'*********************************************************************************************************************************************************************************************************
+Private Function getDaysOfWeek(reportMonth As String, reportYear As String) 'A simple function that calls on other functions to help deduce then output the days of the week on the report.
+    Dim i As Integer: i = 0
+    Do Until i = getDaysMonth(reportMonth)
+        ThisWorkbook.Worksheets(1).Range("B1").Offset(0, i).value = WeekdayName(Weekday(CDate(reportMonth & "/" & ThisWorkbook.Worksheets(1).Range("B2").Offset(0, i).value _
+        & "/" & reportYear)), True)
+        i = i + 1
+    Loop
+End Function
+Private Function getDate() As String 'Returns date as string to driving function as arguments for getDaysofWeek. Used this function instead of handling it in driving function to keep things tidy.
+    Dim master As Workbook
+    Dim masterRange As Range
+    Set master = Workbooks("CBDS Master.xlsm")
+    Set masterRange = master.Worksheets(1).Range("B1")
+    ThisWorkbook.Worksheets(1).Range("A2").value = masterRange.Offset(0).Value2
+    getDate = masterRange.Offset(0).value
+End Function
+Private Function getDaysMonth(reportDate As String) As Integer 'A function that is obviously just a Select Case to return how many days are in the month of the report.
+    Select Case reportDate
+        Case "January"
+            getDaysMonth = 31
+        Case "February"
+            getDaysMonth = leapYearCheck(reportDate)
+        Case "March"
+            getDaysMonth = 31
+        Case "April"
+            getDaysMonth = 30
+        Case "May"
+            getDaysMonth = 31
+        Case "June"
+            getDaysMonth = 30
+        Case "July"
+            getDaysMonth = 31
+        Case "August"
+            getDaysMonth = 31
+        Case "September"
+            getDaysMonth = 30
+        Case "October"
+            getDaysMonth = 31
+        Case "November"
+            getDaysMonth = 30
+        Case "December"
+            getDaysMonth = 31
+    End Select
+End Function
+Private Function leapYearCheck(reportDate As String) As Integer 'Checks for leap year. Doesn't meet 100% requirement but program will not be in use before the next leap year anomaly in 2100.
+    Dim leapYear As Integer
+    leapYear = CInt(Right(reportDate, 4))
+    If leapYear Mod 4 = 0 Then
+        leapYearCheck = 29
+    Else
+        leapYearCheck = 28
+    End If
+End Function
+'*********************************************************************************************************************************************************************************************************
+
+'$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+Private Function trimDays() 'Function used to delete columns that are weekends or not a day.
+    Dim i As Integer: i = 0
+    Dim daysRange As Range
+    Set daysRange = ThisWorkbook.Worksheets(1).Range("B1")
+    Do Until StrComp(daysRange.Offset(1, i).value, "Total", vbTextCompare) = 0
+        If checkDays(daysRange.Offset(0, i)) = True Then
+            ThisWorkbook.Worksheets(1).Columns(i + 2).EntireColumn.Delete
+            i = i - 1
+        End If
+        i = i + 1
+    Loop
+End Function
+Private Function checkDays(reportDay As String) As Boolean 'Checks if day is a weekend or is not a day at all (ie 31st of June)
+    Select Case reportDay
+        Case "Sun"
+            checkDays = True
+        Case "Sat"
+            checkDays = True
+        Case ""
+            checkDays = True
+        Case Else
+            checkDays = False
+    End Select
+End Function
+'$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+
+'@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+Private Function getAttendanceRoster() 'Function that opens up a different workbooks that grabs the active roster. Function then pulls that data into the report.
+    Dim i As Integer: i = 0
+    Dim rosterBook As Workbook
+    Dim rosterRange As Range
+    Set rosterBook = Workbooks.Open("\\isabella\Shared\Attendance\Attendance Backend\CBDS Dot\Attendance CBDS Roster.xlsm")
+    Set rosterRange = rosterBook.Worksheets(1).Range("A1")
+    Do Until IsEmpty(rosterRange.Offset(i)) = True And IsEmpty(rosterRange.Offset(i + 1)) = True
+        ThisWorkbook.Worksheets(1).Range("A3").Offset(i).value = rosterRange.Offset(i).value
+        i = i + 1
+    Loop
+    rosterBook.Close False
+End Function
+'@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+'%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Private Function formatCells() 'Formats the room names. Makes them bold and sets font size to 16.
+    Dim i As Integer: i = 0
+    Dim formatNamesRange As Range
+    Set formatNamesRange = ThisWorkbook.Worksheets(1).Range("A3")
+    Do Until IsEmpty(formatNamesRange.Offset(i)) = True And IsEmpty(formatNamesRange.Offset(i + 1)) = True
+        If checkForRoom(formatNamesRange.Offset(i).value) = True Then
+            formatNamesRange.Offset(i).Font.Bold = True
+            formatNamesRange.Offset(i).Font.Size = 16
+        End If
+        i = i + 1
+    Loop
+End Function
+Private Function checkForRoom(roomName As String) As Boolean 'Select case that returns true if the cell contains a room name.
+    Select Case roomName
+        Case "Room 1"
+            checkForRoom = True
+        Case "Room 2"
+            checkForRoom = True
+        Case "Room 3"
+            checkForRoom = True
+        Case "Room 4"
+            checkForRoom = True
+        Case "Vinyl Room"
+            checkForRoom = True
+        Case "Deaf Services"
+            checkForRoom = True
+        Case "Deaf Behavioral"
+            checkForRoom = True
+        Case Else
+            checkForRoom = False
+    End Select
+End Function
+'%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+'^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Private Function addBorders() 'Adds borders to the report for easier reading.
+    Dim i As Integer: Dim j As Integer: i = 0: j = 0
+    Dim borderRange As Range
+    Set borderRange = ThisWorkbook.Worksheets(1).Range("A4")
+    Do Until IsEmpty(borderRange.Offset(i)) = True
+        Do
+            borderRange.Offset(i, j).Borders.LineStyle = xlContinuous
+            j = j + 1
+        Loop Until StrComp(ThisWorkbook.Worksheets(1).Range("A2").Offset(0, j - 1).value, "Total ""NS""") = 0
+        i = i + 1
+        If IsEmpty(borderRange.Offset(i)) = True And IsEmpty(borderRange.Offset(i + 1)) = False Then
+            i = i + 2
+        End If
+        j = 0
+    Loop
+End Function
+'^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+'+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Private Function addAlternateRows() 'Highlights every other row line in yellow for easier reading.
+    Dim i As Integer: Dim j As Integer: i = 0: j = 0
+    Dim colorRange As Range
+    Set colorRange = ThisWorkbook.Worksheets(1).Range("A4")
+    Do Until IsEmpty(colorRange.Offset(i)) = True
+        Do
+            colorRange.Offset(i, j).Interior.ColorIndex = 6
+            j = j + 1
+        Loop Until StrComp(ThisWorkbook.Worksheets(1).Range("A2").Offset(0, j - 1).value, "Total ""NS""") = 0
+        If IsEmpty(colorRange.Offset(i + 1)) = True And IsEmpty(colorRange.Offset(i + 2)) = False Then
+            i = i + 1
+        Else
+            i = i + 2
+        End If
+        If IsEmpty(colorRange.Offset(i)) = True And IsEmpty(colorRange.Offset(i + 1)) = False Then
+            i = i + 2
+        End If
+        j = 0
+    Loop
+End Function
+'+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+'=========================================================================================================================================================================================================
+Private Function addExtraDates() 'Adds the days of week and dates on top of every room for easier analysis of the report.
+    Dim originalDates As Range
+    Dim newDates As Range
+    Dim i As Integer: Dim j As Integer: Dim k As Integer: i = 0
+    Set originalDates = ThisWorkbook.Worksheets(1).Range("B1")
+    Set newDates = ThisWorkbook.Worksheets(1).Range("A1")
+    For k = 0 To 5
+        i = getNextRange(newDates, i)
+        j = 0
+        Do
+            newDates.Offset(i, j + 1).value = originalDates.Offset(0, j).value
+            newDates.Offset(i + 1, j + 1).value = originalDates.Offset(1, j).value
+            j = j + 1
+        Loop Until StrComp(originalDates.Offset(1, j - 1).value, "Total ""NS""", vbTextCompare) = 0
+    Next k
+End Function
+Private Function getNextRange(newDates As Range, i As Integer) As Integer 'Returns the next range to input the extra dates.
+    i = i + 1
+    Do Until IsEmpty(newDates.Offset(i)) = True And IsEmpty(newDates.Offset(i + 1)) = False
+        i = i + 1
+    Loop
+    getNextRange = i
+End Function
+'=========================================================================================================================================================================================================
+
+'---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Private Function centerColumns() 'Centers columns in the report for easier reading.
+    Dim i As Integer: i = 0
+    Dim centerRange As Range
+    Set centerRange = ThisWorkbook.Worksheets(1).Range("B2")
+    Do
+        ThisWorkbook.Worksheets(1).Columns(i + 2).HorizontalAlignment = xlCenter
+        i = i + 1
+    Loop Until StrComp(centerRange.Offset(0, i - 1), "Total ""NS""", vbTextCompare) = 0
+End Function
+'---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+'#########################################################################################################################################################################################################
+'#########################################################################################################################################################################################################
+
+'#########################################################################################################################################################################################################
+'#########################################################################################################################################################################################################
+Private Function getData() 'Function that pulls data from the billing report into this report.
+    Dim i As Integer: i = 1
+    Dim sourceRange As Range: Dim outPutRange As Range
+    Set outPutRange = ThisWorkbook.Worksheets(1).Range("A4")
+    Do Until i = 5
+        Set sourceRange = Workbooks("CBDS Master.xlsm").Worksheets(i).Range("A4")
+        Call getWsData(sourceRange, outPutRange)
+        i = i + 1
+    Loop
+End Function
+Private Function getWsData(sourceRange As Range, outPutRange As Range) 'Function that drives the data pull from the CBDS Master
+    Dim j As Integer: Dim k As Integer: Dim m As Integer: Dim n As Integer: j = 0
+    Do Until IsEmpty(sourceRange.Offset(j)) = True
+        k = getMatchPosition(sourceRange.Offset(j).value, outPutRange)
+        If StrComp(sourceRange.Offset(j).value, outPutRange.Offset(k).value, vbTextCompare) = 0 Then
+            Call getOutPut(sourceRange, outPutRange, j, k)
+        End If
+        j = j + 1
+    Loop
+End Function
+Private Function getOutPut(sourceRange As Range, outPutRange As Range, j As Integer, k As Integer) 'Function that sets the output for monthly attendance.
+    Dim m As Integer: Dim n As Integer: n = 2: m = 1
+    Do Until StrComp(outPutRange.Offset(-2, m).value, "Total", vbTextCompare) = 0
+        n = checkWEandHol(sourceRange, outPutRange, j, n)
+        m = getHolPosition(sourceRange, outPutRange, n, m)
+        If sourceRange.Offset(j, n).value < 1 Then
+            outPutRange.Offset(k, m).value = getAbsentCode(sourceRange.Offset(j, n).value)
+        Else
+            outPutRange.Offset(k, m).value = sourceRange.Offset(j, n).value / 4
+        End If
+        m = m + 1
+        n = n + 1
+    Loop
+End Function
+Private Function getHolPosition(sourceRange As Range, outPutRange As Range, n As Integer, m As Integer) As Integer 'Gets new position for output range if there are any holidays.
+    Do Until sourceRange.Offset(-1, n).value = outPutRange.Offset(-2, m)
+        m = m + 1
+    Loop
+    getHolPosition = m
+End Function
+Private Function getMatchPosition(name As String, outPutRange As Range) As Integer 'Looks for match in name and then returns position of match
+    Dim k As Integer: k = 0
+    Do Until StrComp(name, outPutRange.Offset(k).value, vbTextCompare) = 0 Or (IsEmpty(outPutRange.Offset(k)) = True And IsEmpty(outPutRange.Offset(k + 1)) = True)
+        k = k + 1
+    Loop
+    getMatchPosition = k
+End Function
+Private Function checkWEandHol(sourceRange As Range, outPutRange As Range, j As Integer, n As Integer) As Integer 'Checks to see if there are any holidays and outputs the position.
+    Dim counter As Integer: Dim i As Integer: i = n: counter = 0
+    If IsEmpty(sourceRange.Offset(j, n)) = True Then
+        Do Until IsEmpty(sourceRange.Offset(j, i)) = False
+            counter = counter + 1
+            i = i + 1
+        Loop
+        checkWEandHol = n + counter
+    Else
+        checkWEandHol = n
+    End If
+End Function
+Private Function getAbsentCode(value As Double) As String 'returns the corresponding absent code.
+    If value = 0.1 Then
+        getAbsentCode = "NS"
+    Else
+        getAbsentCode = "S"
+    End If
+End Function
+'#########################################################################################################################################################################################################
+'#########################################################################################################################################################################################################
+
+'#########################################################################################################################################################################################################
+'#########################################################################################################################################################################################################
+Private Function tallyData() 'Driving function for tallying totals for individuals.
+    Call tallyPresent
+    Call tallyAbsent
+    Call tallyNS
+End Function
+'*********************************************************************************************************************************************************************************************************
+Private Function tallyPresent() 'Tallies how many days an individuals was in for the month.
+    Dim i As Integer: i = 0: Dim j As Integer: Dim counter As Integer
+    Dim presentRange As Range
+    Set presentRange = ThisWorkbook.Worksheets(1).Range("A4")
+    Do Until IsEmpty(presentRange.Offset(i)) = True And IsEmpty(presentRange.Offset(i + 1)) = True
+        j = 0
+        counter = 0
+        Do Until StrComp(presentRange.Offset(-2, j).value, "Total", vbTextCompare) = 0
+            If IsNumeric(presentRange.Offset(i, j).value) = True Then
+                counter = counter + 1
+            End If
+            j = j + 1
+        Loop
+        presentRange.Offset(i, j).value = counter
+        i = i + 1
+        If IsEmpty(presentRange.Offset(i)) = True And IsEmpty(presentRange.Offset(i + 1)) = False Then
+            i = i + 2
+        End If
+    Loop
+End Function
+'*********************************************************************************************************************************************************************************************************
+
+'$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+Private Function tallyAbsent() 'Tallies how many days an individual was absent for the month.
+    Dim i As Integer: i = 0: Dim j As Integer: Dim counter As Integer
+    Dim absentRange As Range
+    Set absentRange = ThisWorkbook.Worksheets(1).Range("A4")
+    Do Until IsEmpty(absentRange.Offset(i)) = True And IsEmpty(absentRange.Offset(i + 1)) = True
+        j = 0
+        counter = 0
+        Do Until StrComp(absentRange.Offset(-2, j).value, "Total Absent", vbTextCompare) = 0
+            If StrComp(absentRange.Offset(i, j).value, "S", vbTextCompare) = 0 Then
+                counter = counter + 1
+            End If
+            j = j + 1
+        Loop
+        absentRange.Offset(i, j).value = counter
+        i = i + 1
+        If IsEmpty(absentRange.Offset(i)) = True And IsEmpty(absentRange.Offset(i + 1)) = False Then
+            i = i + 2
+        End If
+    Loop
+End Function
+'$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+
+'@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+Private Function tallyNS() 'Tallies how many days individuall was not scheduled for the month.
+    Dim i As Integer: i = 0: Dim j As Integer: Dim counter As Integer
+    Dim NSRange As Range
+    Set NSRange = ThisWorkbook.Worksheets(1).Range("A4")
+    Do Until IsEmpty(NSRange.Offset(i)) = True And IsEmpty(NSRange.Offset(i + 1)) = True
+        j = 0
+        counter = 0
+        Do Until StrComp(NSRange.Offset(-2, j).value, "Total ""NS""", vbTextCompare) = 0
+            If StrComp(NSRange.Offset(i, j).value, "NS", vbTextCompare) = 0 Then
+                counter = counter + 1
+            End If
+            j = j + 1
+        Loop
+        NSRange.Offset(i, j).value = counter
+        i = i + 1
+        If IsEmpty(NSRange.Offset(i)) = True And IsEmpty(NSRange.Offset(i + 1)) = False Then
+            i = i + 2
+        End If
+    Loop
+End Function
+'@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+'#########################################################################################################################################################################################################
+'#########################################################################################################################################################################################################
+
+'#########################################################################################################################################################################################################
+'#########################################################################################################################################################################################################
+Private Function saveWorkBook() 'Saves workbook with month and year in the file name to appropriate folder.
+    ThisWorkbook.SaveAs Filename:="\\Isabella\shared\attendance\attendance\CBDS Monthly\MonthlyReport" & _
+    Format(Range("A2"), "mmmm_yyyy "), FileFormat:=51, Password:="", _
+    WriteResPassword:="", ReadOnlyRecommended:=False, CreateBackup:=False
+End Function
+'#########################################################################################################################################################################################################
+'#########################################################################################################################################################################################################
+
+'#########################################################################################################################################################################################################
+'#########################################################################################################################################################################################################
+Private Function sendEmail() 'Sends e-mail to LaWan, Tracey,Margaret, Amanda and program author with a link to the report.
+    Dim OutApp As Object
+    Dim OutMail As Object
+    Dim strbody As String
+    If ThisWorkbook.Path <> "" Then
+        Set OutApp = CreateObject("Outlook.Application")
+        Set OutMail = OutApp.CreateItem(0)
+        strbody = "<font size=""3"" face=""Calibri"">" & _
+                  "Hello,<br><br>" & _
+                  "There is a monthly attendance report awaiting review. Click on this link to open the report : " & _
+                  "<A HREF=""file://" & ThisWorkbook.FullName & _
+                  """>Link to the file</A>" & _
+                  "<br><br>Regards" & _
+                  "<br><br></font>"
+        On Error Resume Next
+        With OutMail
+            .To = "tcunningham@workinc.org; lswain@workinc.org; mdinon@workinc.org; aneal@workinc.org"
+            .CC = "dodonnell@workinc.org"
+            .BCC = ""
+            .Subject = ThisWorkbook.name
+            .HTMLBody = strbody
+            .Send
+        End With
+        On Error GoTo 0
+        Set OutMail = Nothing
+        Set OutApp = Nothing
+    Else
+        MsgBox "The ActiveWorkbook does not have a path, Save the file first."
+    End If
+End Function
+'#########################################################################################################################################################################################################
+'#########################################################################################################################################################################################################
